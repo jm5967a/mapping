@@ -49,7 +49,7 @@ class PCA9685:
     prescale = math.floor(prescaleval + 0.5)
 
 
-    oldmode = self.read(self.__MODE1);
+    oldmode = self.read(self.__MODE1)
     newmode = (oldmode & 0x7F) | 0x10        # sleep
     self.write(self.__MODE1, newmode)        # go to sleep
     self.write(self.__PRESCALE, int(math.floor(prescale)))
@@ -65,6 +65,7 @@ class PCA9685:
     self.write(self.__LED0_OFF_H+4*channel, off >> 8)
   def setMotorPwm(self,channel,duty):
     self.setPWM(channel,0,duty)
+
   def setServoPulse(self, channel, pulse):
     "Sets the Servo Pulse,The PWM frequency must be 50HZ"
     pulse = pulse*4096/20000        #PWM frequency is 50HZ,the period is 20000us
