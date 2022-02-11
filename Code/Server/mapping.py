@@ -5,11 +5,6 @@ from servo import *
 import numpy as nm
 import math
 import sys
-import threading
-
-import PCA9685
-
-nm.set_printoptions(threshold=sys.maxsize)
 
 class Ultrasonic:
     def __init__(self):
@@ -17,7 +12,7 @@ class Ultrasonic:
         self.trigger_pin = 27
         self.echo_pin = 22
         self.data_map = []
-        self.map_size = (60, 60)
+        self.map_size = (30, 30)
         GPIO.setmode(GPIO.BCM)
         GPIO.setup(self.trigger_pin, GPIO.OUT)
         GPIO.setup(self.echo_pin, GPIO.IN)
@@ -46,29 +41,6 @@ class Ultrasonic:
         return int(distance_cm[2])
 
     def run_motor(self):
-        i_left, i_center_left, i_center_right, i_right = nm.logical_or(self.data_map[0][1:-1], self.data_map[1][1:-1])
-
-        if (i_left == 1 and i_center_left == 1 and i_center_right == 1 or i_right == 1) \
-                or i_center_left == 1 and i_center_right == 1:
-            self.PWM.setMotorModel(-1450, -1450, -1450, -1450)
-
-            if (i_left == 1 or i_center_left == 1) and not (i_center_right == 1 or i_right == 1):
-                self.PWM.setMotorModel(1450, 1450, -1450, -1450)
-            else:
-                self.PWM.setMotorModel(-1450, -1450, 1450, 1450)
-
-        elif i_left == 1 and i_center_left == 1:
-            PWM.setMotorModel(1500, 1500, -1500, -1500)
-        elif i_right == 1 and i_center_right == 1:
-            PWM.setMotorModel(-1500, -1500, 1500, 1500)
-        elif i_left or i_center_left:
-            PWM.setMotorModel(1500, 1500, -1000, -1000)
-        elif i_right or i_center_right:
-            PWM.setMotorModel(-1500, -1500, 1500, 1500)
-        else:
-            self.PWM.setMotorModel(600, 600, 600, 600)
-
-    def run_motor2(self):
         L = self.left
         M = self.middle
         R = self.right
@@ -97,18 +69,19 @@ class Ultrasonic:
 
     def map_world(self):
         temp = []
-        tempMap = nm.zeros([60, 60])
+        tempMap = nm.zeros([30, 80], dtype=int).astype(int)
         self.left = self.middle = self.right = 100
 
-        for i in range(20, 160, 10):  # 34, 68, 102
-            time.sleep(.05)
+        for i in range(0, 170, 10):  # 20 30 40 50 60 70 80
+            time.sleep(.2)
             self.pwm_S.setServoPwm('0', i)
             distance = self.get_distance()
 
-            x = math.floor(math.cos(math.radians(i - 90)) * distance)
-            y = math.floor(math.sin(math.radians(i - 90)) * distance)
-            isAssumedClear = abs(y) >= 60 or abs(x) >= 60
+            testing = math.radians(i)
+            x = math.floor(math.cos(testing) * distance) + 40
+            y = math.floor(math.sin(testing) * distance // 10)
 
+            isAssumedClear = abs(y) >= 30 or abs(x) >= 80
             temp.append([x, y, isAssumedClear])
 
             if i == 30:
@@ -118,20 +91,24 @@ class Ultrasonic:
             elif i == 130:
                 self.right = distance
 
-        previousCordinates = None
-        for cords in temp:
-            x, y, isAssumedClear = cords
+        temp.sort(key=lambda itm: itm[0])
+        pointer = 0
 
-            if previousCordinates is not None and not isAssumedClear:
-                prevX, prevY = previousCordinates
-                for x_values in range(prevX, x):
-                    for y_values in range(prevY, y):
-                        print(x, prevX)
+        while pointer < len(temp):
+            if not temp[pointer][2]:
+                x, y, _ = temp[pointer]
+                tempMap[y][x] = 5
 
-                        tempMap[y_values][x_values] = 1
+                if len(temp) != pointer + 1 and temp[pointer + 1] and not temp[pointer + 1][2] and temp[pointer + 1][1] < y + 2:
+                    x_val, y_val, _ = temp[pointer + 1]
+                    for x_cords in range(x + 1, x_val):
+                        tempMap[y][x_cords] = 1
 
-            previousCordinates = None if isAssumedClear is True else [x, y]
+            pointer += 1
 
+        nm.set_printoptions(threshold=sys.maxsize, precision=3, linewidth=350)
+        print("")
+        print(tempMap)
         return tempMap
 
     def run(self):
@@ -140,11 +117,8 @@ class Ultrasonic:
         self.pwm_S.setServoPwm('1', 90)
 
         while True:
-            self.data_map = self.map_world([0, 171, 34])
-            self.run_motor2()
-
-            nm.savetxt('file.txt', self.data_map)
-
+            self.data_map = self.map_world()
+            self.run_motor()
 
 ultrasonic = Ultrasonic()
 # Main program logic follows:
